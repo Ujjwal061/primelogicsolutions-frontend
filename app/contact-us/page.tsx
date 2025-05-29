@@ -95,9 +95,9 @@ export default function ContactUsPage() {
               <Phone className="h-6 w-6 text-[#003087]" />
             </div>
             <h3 className="text-lg font-semibold mb-2">Call Us</h3>
-            <p className="text-gray-600 mb-4">Mon-Fri from 9am to 6pm</p>
+            <p className="text-gray-600 mb-4">Monday–Friday: 9:00 AM – 6:00 PM</p>
             <a href="tel:+1234567890" className="text-[#003087] font-medium hover:underline">
-              +1 (234) 567-890
+              +1 (916) 699-0091
             </a>
           </div>
 
@@ -108,11 +108,11 @@ export default function ContactUsPage() {
             <h3 className="text-lg font-semibold mb-2">Visit Us</h3>
             <p className="text-gray-600 mb-4">Our office location</p>
             <address className="not-italic text-[#003087]">
-              123 Business Avenue
+              11166 Fairfax Blvd Ste 500 
               <br />
-              Suite 456
+              Fairfax
               <br />
-              New York, NY 10001
+              VA 22030
             </address>
           </div>
         </div>

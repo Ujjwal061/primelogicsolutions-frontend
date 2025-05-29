@@ -1,11 +1,27 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 
 // Import the ImageWithFallback component
 import { ImageWithFallback } from "@/components/ui/image-with-fallback"
+
+// Utility function to generate responsive image URL with appropriate sizing
+const getResponsiveImageUrl = (originalUrl: string, width: number, quality: number = 75) => {
+  if (!originalUrl || originalUrl.includes('placeholder.svg')) {
+    return originalUrl
+  }
+  
+  // If using a CMS or image service that supports query parameters
+  if (originalUrl.includes('pls-cms.vercel.app') || originalUrl.includes('cloudinary') || originalUrl.includes('imagekit')) {
+    const separator = originalUrl.includes('?') ? '&' : '?'
+    return `${originalUrl}${separator}w=${width}&q=${quality}&f=webp`
+  }
+  
+  // For other URLs, return as-is (you might want to implement your own image optimization service)
+  return originalUrl
+}
 
 // Update the Slide interface to include buttonLink
 interface Slide {
@@ -24,9 +40,9 @@ interface HeroSectionProps {
 
 export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
   const [index, setIndex] = useState(0)
-  const [prevIndex, setPrevIndex] = useState(0)
   const [sortedSlides, setSortedSlides] = useState<Slide[]>([])
   const [imageLoadError, setImageLoadError] = useState<Record<string, boolean>>({})
+  const [imagesLoaded, setImagesLoaded] = useState<Record<string, boolean>>({})
 
   // Process slides when they change
   useEffect(() => {
@@ -43,19 +59,43 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
     setSortedSlides(sorted)
   }, [slides])
 
+  // Optimized slide rotation with useCallback
+  const rotateSlide = useCallback(() => {
+    setIndex((prevIndex) => (prevIndex + 1) % sortedSlides.length)
+  }, [sortedSlides.length])
+
   // Set up the slide rotation interval
   useEffect(() => {
     if (!sortedSlides || sortedSlides.length === 0) return
 
-    const intervalId = window.setInterval(() => {
-      setPrevIndex(index)
-      setIndex((prevIndex) => (prevIndex + 1) % sortedSlides.length)
-    }, 5000)
+    const intervalId = window.setInterval(rotateSlide, 5000)
 
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [index, sortedSlides])
+  }, [rotateSlide, sortedSlides])
+
+  // Handle image load success
+  const handleImageLoad = useCallback((slideIndex: number) => {
+    setImagesLoaded((prev) => ({
+      ...prev,
+      [slideIndex]: true,
+    }))
+  }, [])
+
+  // Handle image error
+  const handleImageError = useCallback((slideIndex: number) => {
+    console.error(`Failed to load image for slide ${slideIndex}:`, sortedSlides[slideIndex]?.image)
+    setImageLoadError((prev) => ({
+      ...prev,
+      [slideIndex]: true,
+    }))
+  }, [sortedSlides])
+
+  // Handle dot click with useCallback
+  const handleDotClick = useCallback((i: number) => {
+    setIndex(i)
+  }, [])
 
   // If no slides are available, show a placeholder
   if (!sortedSlides || sortedSlides.length === 0) {
@@ -71,7 +111,7 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
 
   // Unified transition settings
   const transitionSettings = {
-    duration: 1,
+    duration: 0.8,
     ease: [0.25, 0.1, 0.25, 1.0],
   }
 
@@ -96,7 +136,7 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
     },
     hover: {
       scale: 1.05,
-      backgroundColor: "#0047AB", // Deeper blue on hover
+      backgroundColor: "#0047AB",
       boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)",
       transition: {
         duration: 0.3,
@@ -114,86 +154,82 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
 
   // Content animation variants
   const contentVariants = {
-    initial: { y: "-50%", opacity: 0 },
+    initial: { y: "-30%", opacity: 0 },
     animate: { y: "0%", opacity: 1, transition: transitionSettings },
-    exit: { y: "50%", opacity: 0, transition: transitionSettings },
+    exit: { y: "30%", opacity: 0, transition: transitionSettings },
   }
 
   // Ensure index is within bounds
   const safeIndex = Math.min(index, sortedSlides.length - 1)
-  const safePrevIndex = Math.min(prevIndex, sortedSlides.length - 1)
-
-  // Handle image error
-  const handleImageError = (slideIndex: number) => {
-    console.error(`Failed to load image for slide ${slideIndex}:`, sortedSlides[slideIndex].image)
-    setImageLoadError((prev) => ({
-      ...prev,
-      [slideIndex]: true,
-    }))
-  }
+  const currentSlide = sortedSlides[safeIndex]
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
-      {/* Image transitions */}
-      <div className="absolute inset-0">
-        {/* Current image */}
-        <AnimatePresence initial={false}>
+      {/* Fixed aspect ratio container to prevent layout shifts */}
+      <div className="absolute inset-0" style={{ aspectRatio: '16/9' }}>
+        {/* Preload next images with optimized sizes */}
+        {sortedSlides.map((slide, i) => (
+          <div key={`preload-${i}`} className="hidden">
+            <ImageWithFallback
+              src={getResponsiveImageUrl(slide.image, 1024, 60) || "/placeholder.svg?height=1080&width=1920&query=hero slide"}
+              alt={`Preload slide ${i + 1}`}
+              width={1024}
+              height={576}
+              priority={i === 0 || i === 1}
+              quality={60}
+              sizes="(max-width: 640px) 640px, (max-width: 1024px) 1024px, 1920px"
+              onLoad={() => handleImageLoad(i)}
+            />
+          </div>
+        ))}
+
+        {/* Current image with stable positioning */}
+        <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={`image-${safeIndex}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={transitionSettings}
-            className="absolute inset-0"
+            className="absolute inset-0 will-change-opacity"
           >
             {imageLoadError[safeIndex] ? (
               <div className="w-full h-full bg-gray-800 flex items-center justify-center">
                 <span className="text-white text-lg">Image not available</span>
               </div>
             ) : (
-              <ImageWithFallback
-                src={sortedSlides[safeIndex].image || "/placeholder.svg?height=1080&width=1920&query=hero slide"}
-                alt={`Slide ${safeIndex + 1}: ${sortedSlides[safeIndex].heading}`}
-                fill
-                priority={safeIndex === 0} // Priority loading for first slide
-                quality={85}
-                sizes="100vw"
-                className="object-cover"
-              />
+              <div className="relative w-full h-full">
+                <ImageWithFallback
+                  src={getResponsiveImageUrl(currentSlide.image, 1920, 75) || "/placeholder.svg?height=1080&width=1920&query=hero slide"}
+                  alt={`Slide ${safeIndex + 1}: ${currentSlide.heading}`}
+                  fill
+                  priority={safeIndex === 0}
+                  quality={75}
+                  sizes="(max-width: 640px) 640px, (max-width: 1024px) 1024px, (max-width: 1536px) 1536px, 1920px"
+                  className="object-cover"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%'
+                  }}
+                  onLoad={() => handleImageLoad(safeIndex)}
+                />
+              </div>
             )}
           </motion.div>
         </AnimatePresence>
-
-        {/* Previous image (helps with smooth crossfade) */}
-        <motion.div
-          key={`prev-image-${safePrevIndex}`}
-          initial={{ opacity: 1 }}
-          animate={{ opacity: 0 }}
-          transition={transitionSettings}
-          className="absolute inset-0"
-        >
-          {imageLoadError[safePrevIndex] ? (
-            <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-              <span className="text-white text-lg">Image not available</span>
-            </div>
-          ) : (
-            <ImageWithFallback
-              src={sortedSlides[safePrevIndex].image || "/assests/5.png"}
-              alt={`Slide ${safePrevIndex + 1}: ${sortedSlides[safePrevIndex].heading}`}
-              fill
-              quality={85}
-              sizes="100vw"
-              className="object-cover"
-            />
-          )}
-        </motion.div>
       </div>
 
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/40"></div>
+      {/* Overlay with fixed positioning */}
+      <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
-      {/* Content section */}
-      <div className="absolute inset-0 flex flex-col mt-8 justify-center text-white px-6 sm:px-10 lg:px-16 max-w-3xl">
+      {/* Content section with transform3d for GPU acceleration */}
+      <div 
+        className="absolute inset-0 flex flex-col mt-8 justify-center text-white px-6 sm:px-10 lg:px-16 max-w-3xl"
+        style={{ transform: 'translate3d(0,0,0)' }}
+      >
         <AnimatePresence mode="wait">
           <motion.h1
             key={`head-${safeIndex}`}
@@ -202,9 +238,10 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
             animate="animate"
             exit="exit"
             className="text-2xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl text-[#FF6B35] whitespace-normal sm:whitespace-nowrap overflow-visible text-center w-full font-bold mb-4 sm:mb-8"
+            style={{ transform: 'translate3d(0,0,0)' }}
           >
             <span className="text-white block sm:inline">PLS Services -</span>{" "}
-            <span className="block sm:inline">{sortedSlides[safeIndex].head}</span>
+            <span className="block sm:inline">{currentSlide.head}</span>
           </motion.h1>
         </AnimatePresence>
 
@@ -216,8 +253,9 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
             animate="animate"
             exit="exit"
             className="text-white font-bold mb-4 sm:mb-8 whitespace-normal sm:whitespace-nowrap overflow-visible text-center w-full text-2xl sm:text-[6vw] md:text-[5vw] lg:text-[4vw]"
+            style={{ transform: 'translate3d(0,0,0)' }}
           >
-            {sortedSlides[safeIndex].heading}
+            {currentSlide.heading}
           </motion.h1>
         </AnimatePresence>
 
@@ -229,12 +267,13 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
             animate="animate"
             exit="exit"
             className="text-sm sm:text-base md:text-lg mt-4 lg:text-xl xl:text-2xl whitespace-normal sm:whitespace-nowrap overflow-visible text-center w-full py-2 md:py-2 px-2 sm:px-0"
+            style={{ transform: 'translate3d(0,0,0)' }}
           >
-            {sortedSlides[safeIndex].text}
+            {currentSlide.text}
           </motion.p>
         </AnimatePresence>
 
-        {/* Replace the button with a Link component */}
+        {/* Button with stable positioning */}
         <AnimatePresence mode="wait">
           <motion.div
             key={`button-${safeIndex}`}
@@ -243,12 +282,13 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
             animate="animate"
             exit="exit"
             className="mt-4 sm:mt-6"
+            style={{ transform: 'translate3d(0,0,0)' }}
           >
-            <Link href={sortedSlides[safeIndex].buttonLink || "/contact"}>
+            <Link href={currentSlide.buttonLink || "/contact"}>
               <motion.button
                 whileHover="hover"
                 whileTap="tap"
-                className="text-base sm:text-lg md:text-xl bg-[#FF6B35] text-white rounded-lg shadow-lg transition-colors duration-300 px-4 py-2 sm:px-6 sm:py-3 md:px-8 md:py-4 w-44 h-12 sm:w-56 sm:h-16 mx-auto sm:mx-0 overflow-hidden relative"
+                className="text-base sm:text-lg md:text-xl bg-[#FF6B35] text-white rounded-lg shadow-lg transition-colors duration-300 px-4 py-2 sm:px-6 sm:py-3 md:px-8 md:py-4 w-44 h-12 sm:w-56 sm:h-16 mx-auto sm:mx-0 overflow-hidden relative will-change-transform"
               >
                 <motion.span className="absolute inset-0 bg-gradient-to-r from-[#FF6B35] to-[#FF8B35] opacity-0 hover:opacity-100 transition-opacity duration-300" />
                 <motion.span className="relative z-10 contrast-100">Discover More</motion.span>
@@ -258,18 +298,18 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
         </AnimatePresence>
       </div>
 
-      {/* Pagination Dots */}
-      <div className="absolute right-2 sm:right-4 md:right-10 top-1/2 transform -translate-y-1/2 flex flex-col space-y-1 sm:space-y-2">
+      {/* Pagination Dots with fixed positioning */}
+      <div 
+        className="absolute right-2 sm:right-4 md:right-10 top-1/2 transform -translate-y-1/2 flex flex-col space-y-1 sm:space-y-2"
+        style={{ transform: 'translate3d(0,-50%,0)' }}
+      >
         {sortedSlides.map((_, i) => (
           <span
             key={i}
             className={`h-2 w-2 sm:h-3 sm:w-3 md:h-4 md:w-4 rounded-full ${
               i === safeIndex ? "bg-white" : "bg-gray-400"
-            } transition-all duration-300 cursor-pointer`}
-            onClick={() => {
-              setPrevIndex(safeIndex)
-              setIndex(i)
-            }}
+            } transition-all duration-300 cursor-pointer will-change-transform`}
+            onClick={() => handleDotClick(i)}
           />
         ))}
       </div>
