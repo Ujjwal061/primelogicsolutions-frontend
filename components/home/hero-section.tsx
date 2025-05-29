@@ -166,18 +166,17 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
   return (
     <div className="relative h-screen w-full overflow-hidden">
       {/* Fixed aspect ratio container to prevent layout shifts */}
-      <div className="absolute inset-0 w-full h-full">
+      <div className="absolute inset-0" style={{ aspectRatio: '16/9' }}>
         {/* Current image with stable positioning - Optimized for LCP */}
-        <div className="absolute inset-0">
-          <AnimatePresence initial={false}>
-            <motion.div
-              key={`image-${safeIndex}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.5, ease: "easeInOut" }}
-              className="absolute inset-0 will-change-opacity"
-            >
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={`image-${safeIndex}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={transitionSettings}
+            className="absolute inset-0 will-change-opacity"
+          >
             {imageLoadError[safeIndex] ? (
               <div className="w-full h-full bg-gray-800 flex items-center justify-center">
                 <span className="text-white text-lg">Image not available</span>
@@ -204,9 +203,8 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
                 />
               </div>
             )}
-                        </motion.div>
-          </AnimatePresence>
-        </div>
+          </motion.div>
+        </AnimatePresence>
 
         {/* Preload only next image to reduce resource usage */}
         {sortedSlides.length > 1 && (
@@ -225,8 +223,7 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
         )}
       </div>
 
-      {/* Overlay with fixed positioning */}
-      <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+   
 
       {/* Content section with transform3d for GPU acceleration */}
       <div 
