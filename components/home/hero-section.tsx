@@ -166,24 +166,8 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
   return (
     <div className="relative h-screen w-full overflow-hidden">
       {/* Fixed aspect ratio container to prevent layout shifts */}
-      <div className="absolute inset-0" style={{ aspectRatio: '16/9' }}>
-        {/* Preload next images with optimized sizes */}
-        {sortedSlides.map((slide, i) => (
-          <div key={`preload-${i}`} className="hidden">
-            <ImageWithFallback
-              src={getResponsiveImageUrl(slide.image, 1024, 60) || "/placeholder.svg?height=1080&width=1920&query=hero slide"}
-              alt={`Preload slide ${i + 1}`}
-              width={1024}
-              height={576}
-              priority={i === 0 || i === 1}
-              quality={60}
-              sizes="(max-width: 640px) 640px, (max-width: 1024px) 1024px, 1920px"
-              onLoad={() => handleImageLoad(i)}
-            />
-          </div>
-        ))}
-
-        {/* Current image with stable positioning */}
+      <div className="absolute inset-0 w-full h-full">
+        {/* Current image with stable positioning - Optimized for LCP */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={`image-${safeIndex}`}
@@ -200,12 +184,12 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
             ) : (
               <div className="relative w-full h-full">
                 <ImageWithFallback
-                  src={getResponsiveImageUrl(currentSlide.image, 1920, 75) || "/placeholder.svg?height=1080&width=1920&query=hero slide"}
+                  src={getResponsiveImageUrl(currentSlide.image, 1920, 85) || "/placeholder.svg?height=1080&width=1920&query=hero slide"}
                   alt={`Slide ${safeIndex + 1}: ${currentSlide.heading}`}
                   fill
-                  priority={safeIndex === 0}
-                  quality={75}
-                  sizes="(max-width: 640px) 640px, (max-width: 1024px) 1024px, (max-width: 1536px) 1536px, 1920px"
+                  priority={true}
+                  quality={85}
+                  sizes="100vw"
                   className="object-cover"
                   style={{
                     position: 'absolute',
@@ -215,11 +199,28 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
                     height: '100%'
                   }}
                   onLoad={() => handleImageLoad(safeIndex)}
+                  fetchPriority="high"
                 />
               </div>
             )}
           </motion.div>
         </AnimatePresence>
+
+        {/* Preload only next image to reduce resource usage */}
+        {sortedSlides.length > 1 && (
+          <div className="hidden">
+            <ImageWithFallback
+              src={getResponsiveImageUrl(sortedSlides[(safeIndex + 1) % sortedSlides.length].image, 1024, 60) || "/placeholder.svg?height=1080&width=1920&query=hero slide"}
+              alt={`Preload next slide`}
+              width={1024}
+              height={576}
+              priority={false}
+              quality={60}
+              sizes="(max-width: 640px) 640px, (max-width: 1024px) 1024px, 1920px"
+              onLoad={() => handleImageLoad((safeIndex + 1) % sortedSlides.length)}
+            />
+          </div>
+        )}
       </div>
 
       {/* Overlay with fixed positioning */}
@@ -240,8 +241,8 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
             className="text-2xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl text-[#FF6B35] whitespace-normal sm:whitespace-nowrap overflow-visible text-center w-full font-bold mb-4 sm:mb-8"
             style={{ transform: 'translate3d(0,0,0)' }}
           >
-            <span className="text-white block sm:inline">PLS Services -</span>{" "}
-            <span className="block sm:inline">{currentSlide.head}</span>
+            <span className="text-white contrast-100 block sm:inline">PLS Services -</span>{" "}
+            <span className="block contrast-100 sm:inline">{currentSlide.head}</span>
           </motion.h1>
         </AnimatePresence>
 
