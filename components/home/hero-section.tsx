@@ -166,7 +166,7 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
   return (
     <div className="relative h-screen w-full overflow-hidden">
       {/* Fixed aspect ratio container to prevent layout shifts */}
-      <div className="absolute inset-0 w-full h-full">
+      <div className="absolute inset-0" style={{ aspectRatio: '16/9' }}>
         {/* Current image with stable positioning - Optimized for LCP */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
