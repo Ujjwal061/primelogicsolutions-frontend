@@ -60,7 +60,7 @@ const ServiceCard = memo(({ service, index }: { service: Service; index: number 
             width={100}
             height={100}
             className=" w-full h-full"
-            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            sizes=" 100vw,  50vw, 33vw"
             priority={shouldPrioritize}
             loading={shouldPrioritize ? "eager" : "lazy"}
            />
