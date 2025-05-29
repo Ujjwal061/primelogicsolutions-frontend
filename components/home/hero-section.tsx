@@ -223,7 +223,8 @@ export const HeroSection = ({ slides = [] }: HeroSectionProps) => {
         )}
       </div>
 
-   
+      {/* Overlay with fixed positioning */}
+      <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
 
       {/* Content section with transform3d for GPU acceleration */}
       <div 

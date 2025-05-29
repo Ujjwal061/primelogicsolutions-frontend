@@ -57,8 +57,8 @@ const ServiceCard = memo(({ service, index }: { service: Service; index: number 
           <Image
             src={service.image || "/placeholder.svg?height=400&width=400"}
             alt={service.title}
-            width={400}
-            height={400}
+            width={100}
+            height={100}
             className=" w-full h-full"
             sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
             priority={shouldPrioritize}
