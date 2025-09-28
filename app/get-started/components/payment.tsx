@@ -1,22 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
 import Link from "next/link"
-import { Calendar, Check, Download, FileText, Lock, CreditCard, ArrowRight } from "lucide-react"
+import { Calendar, Check, Download, FileText, Lock, Loader2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
-import Appointment from "@/components/home/appointment"
 
 interface ProceedOptionsProps {
   projectData?: any
@@ -26,13 +14,13 @@ interface ProceedOptionsProps {
 export default function ProceedOptions({ projectData, onUpdate }: ProceedOptionsProps) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState("card")
   const [processingPayment, setProcessingPayment] = useState(false)
-  const [paymentComplete, setPaymentComplete] = useState(false)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
 
   // Handle option selection
   const handleOptionSelect = (option: string) => {
     setSelectedOption(option)
+    setPaymentError(null)
 
     if (onUpdate) {
       onUpdate({
@@ -42,32 +30,28 @@ export default function ProceedOptions({ projectData, onUpdate }: ProceedOptions
     }
   }
 
-  // Handle proceed button click
-  const handleProceed = () => {
+  const handleProceed = async () => {
     if (selectedOption === "secure") {
-      alert("Payment backend not implemented yet. Contact your backend developer.");
-      // setShowPaymentModal(true)
+      await handleStripePayment()
     } else if (selectedOption === "quote") {
-      // Simulate PDF download
-      // setTimeout(() => {
-      //   const link = document.createElement("a")
-      //   link.href = "/project-quote.pdf" // This would be a real PDF in production
-      //   link.download = "Project_Quote.pdf"
-      //   document.body.appendChild(link)
-      //   link.click()
-      //   document.body.removeChild(link)
+      setTimeout(() => {
+        const link = document.createElement("a")
+        link.href = "/project-quote.pdf" // This would be a real PDF in production
+        link.download = "Project_Quote.pdf"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
 
-      //   if (onUpdate) {
-      //     onUpdate({
-      //       selectedOption,
-      //       completed: true,
-      //       action: "downloaded_quote",
-      //     })
-      //   }
-      // }, 500)
-      alert("PDF backend not implemented yet. Contact your backend developer.");
+        if (onUpdate) {
+          onUpdate({
+            selectedOption,
+            completed: true,
+            action: "downloaded_quote",
+          })
+        }
+      }, 500)
+      alert("PDF backend not implemented yet. Contact your backend developer.")
     } else if (selectedOption === "consultation") {
-      // We'll use the Link component instead of this window.open
       if (onUpdate) {
         onUpdate({
           selectedOption,
@@ -78,30 +62,77 @@ export default function ProceedOptions({ projectData, onUpdate }: ProceedOptions
     }
   }
 
-  // Handle payment submission
-  const handlePaymentSubmit = () => {
+  const handleStripePayment = async () => {
     setProcessingPayment(true)
+    setPaymentError(null)
 
-    // Simulate payment processing
-    setTimeout(() => {
-      setProcessingPayment(false)
-      setPaymentComplete(true)
+    try {
+      // Get visitor data from localStorage (optional)
+      const visitorData = localStorage.getItem("visitorData")
+      const visitor = visitorData ? JSON.parse(visitorData) : {}
 
-      if (onUpdate) {
-        onUpdate({
-          selectedOption,
-          completed: true,
-          action: "completed_payment",
-          paymentMethod,
-        })
+      // Calculate amount based on project data (example: $1,350 as 25% deposit)
+      const estimatedTotal = 5400 // This should come from your estimate calculation
+      const depositAmount = Math.round(estimatedTotal * 0.25) // 25% deposit
+      const amountInCents = depositAmount * 100 // Convert to cents for Stripe
+
+      // Create checkout session
+      const response = await fetch("/api/payment/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: amountInCents,
+          currency: "usd",
+          customerEmail: visitor.businessEmail || "guest@primelogicsol.com",
+          customerName: visitor.fullName || "Guest User",
+          successUrl: `${window.location.origin}/get-started/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${window.location.origin}/get-started?step=payment`,
+          description: "Project Development - 25% Deposit",
+          metadata: {
+            visitorId: visitor.id || "guest",
+            projectType: "custom_development",
+            depositPercentage: "25",
+          },
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success && result.data.url) {
+        // Store payment session info for later reference
+        localStorage.setItem(
+          "paymentSession",
+          JSON.stringify({
+            sessionId: result.data.sessionId,
+            paymentId: result.data.paymentId,
+            amount: depositAmount,
+            timestamp: new Date().toISOString(),
+          }),
+        )
+
+        // Redirect to Stripe checkout
+        window.location.href = result.data.url
+      } else {
+        setPaymentError(result.message || "Failed to create payment session")
       }
-
-      // Close modal after showing success for a moment
-      setTimeout(() => {
-        setShowPaymentModal(false)
-      }, 2000)
-    }, 2000)
+    } catch (error) {
+      setPaymentError("Network error. Please try again.")
+    } finally {
+      setProcessingPayment(false)
+    }
   }
+
+  // Calculate estimated amounts for display
+  const getEstimatedAmounts = () => {
+    // This should be calculated based on actual project selections
+    const baseAmount = 5400
+    const depositAmount = Math.round(baseAmount * 0.25)
+    return { baseAmount, depositAmount }
+  }
+
+  const { baseAmount, depositAmount } = getEstimatedAmounts()
 
   return (
     <div className="w-full p-4 sm:p-6 md:p-8">
@@ -112,6 +143,17 @@ export default function ProceedOptions({ projectData, onUpdate }: ProceedOptions
             Select how you'd like to proceed with your project. We're ready to support you every step of the way.
           </p>
         </div>
+
+        {paymentError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md max-w-2xl mx-auto">
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-red-500 rounded-full mr-2 flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
+              <span className="text-red-700 text-sm">{paymentError}</span>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Option 1: Secure My Project */}
@@ -139,20 +181,21 @@ export default function ProceedOptions({ projectData, onUpdate }: ProceedOptions
               </CardHeader>
               <CardContent className="pb-4 flex-grow flex flex-col">
                 <p className="text-sm text-gray-600 mb-4 flex-grow">
-                  Lock in your project now with a 25% deposit. Your project will be prioritized in our queue.
+                  Lock in your project now with a 25% deposit (${depositAmount.toLocaleString()}). Your project will be
+                  prioritized in our queue.
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center mt-6">
                   <div className="w-10 h-6 bg-gray-100 rounded flex items-center justify-center">
-                    <Image src="/assets/visa-icon.png" alt="Visa" width={20} height={12} />
+                    <span className="text-xs font-bold text-blue-600">VISA</span>
                   </div>
                   <div className="w-10 h-6 bg-gray-100 rounded flex items-center justify-center">
-                    <Image src="/assets/mastercard-icon.png" alt="Mastercard" width={20} height={12} />
+                    <span className="text-xs font-bold text-red-600">MC</span>
                   </div>
                   <div className="w-10 h-6 bg-gray-100 rounded flex items-center justify-center">
-                    <Image src="/assets/paypal-icon.png" alt="PayPal" width={20} height={12} />
+                    <span className="text-xs font-bold text-blue-800">PP</span>
                   </div>
                   <div className="w-10 h-6 bg-gray-100 rounded flex items-center justify-center">
-                    <Image src="/assets/upi-icon.png" alt="UPI" width={20} height={12} />
+                    <span className="text-xs font-bold text-green-600">UPI</span>
                   </div>
                 </div>
               </CardContent>
@@ -252,20 +295,29 @@ export default function ProceedOptions({ projectData, onUpdate }: ProceedOptions
           ) : (
             <Button
               onClick={handleProceed}
-              disabled={!selectedOption}
-              className="px-8 py-6 text-lg bg-[#FF6B35] hover:bg-[#e55a29] flex items-center gap-2"
+              disabled={!selectedOption || processingPayment}
+              className="px-8 py-6 text-lg bg-[#FF6B35] hover:bg-[#e55a29] flex items-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              {selectedOption === "secure" && (
+              {processingPayment ? (
                 <>
-                  Secure My Project <Lock className="ml-2 h-4 w-4" />
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  {selectedOption === "secure" && (
+                    <>
+                      Secure My Project <Lock className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                  {selectedOption === "quote" && (
+                    <>
+                      Download Quote <Download className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                  {!selectedOption && "Select an Option"}
                 </>
               )}
-              {selectedOption === "quote" && (
-                <>
-                  Download Quote <Download className="ml-2 h-4 w-4" />
-                </>
-              )}
-              {!selectedOption && "Select an Option"}
             </Button>
           )}
         </div>
@@ -283,147 +335,26 @@ export default function ProceedOptions({ projectData, onUpdate }: ProceedOptions
           </div>
         )}
 
-        {/* Payment Modal */}
-        <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Secure Your Project</DialogTitle>
-              <DialogDescription>
-                Complete your 25% deposit payment to secure your project and get started right away.
-              </DialogDescription>
-            </DialogHeader>
-
-            {!paymentComplete ? (
-              <>
-                <div className="space-y-4 py-4">
-                  <div className="border rounded-lg p-4">
-                    <div className="flex justify-between mb-2">
-                      <span className="font-medium">Project Deposit (25%)</span>
-                      <span>$1,350.00</span>
-                    </div>
-                    <div className="text-sm text-gray-500 mb-4">Based on your project estimate</div>
-                    <div className="border-t pt-2 flex justify-between font-medium">
-                      <span>Total Due Today</span>
-                      <span>$1,350.00</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-medium mb-3">Select Payment Method</h4>
-                    <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-3">
-                      <div className="flex items-center space-x-2 border rounded-lg p-3">
-                        <RadioGroupItem value="card" id="payment-card" />
-                        <Label htmlFor="payment-card" className="flex items-center gap-2 cursor-pointer">
-                          <CreditCard className="h-4 w-4" />
-                          Credit/Debit Card
-                        </Label>
-                        <div className="ml-auto flex gap-1">
-                          <Image src="/visa-icon.png" alt="Visa" width={24} height={16} />
-                          <Image src="/mastercard-icon.png" alt="Mastercard" width={24} height={16} />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-2 border rounded-lg p-3">
-                        <RadioGroupItem value="paypal" id="payment-paypal" />
-                        <Label htmlFor="payment-paypal" className="flex items-center gap-2 cursor-pointer">
-                          <Image src="/paypal-icon.png" alt="PayPal" width={16} height={16} />
-                          PayPal
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center space-x-2 border rounded-lg p-3">
-                        <RadioGroupItem value="upi" id="payment-upi" />
-                        <Label htmlFor="payment-upi" className="flex items-center gap-2 cursor-pointer">
-                          <Image src="/upi-icon.png" alt="UPI" width={16} height={16} />
-                          UPI Payment
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-
-                  {paymentMethod === "upi" && (
-                    <div className="border rounded-lg p-4 bg-gray-50 flex flex-col items-center">
-                      <h4 className="text-sm font-medium mb-2">Scan QR Code to Pay</h4>
-                      <div className="bg-white p-2 rounded-lg mb-3">
-                        <Image src="/upi-qr-code.png" alt="UPI QR Code" width={180} height={180} />
-                      </div>
-                      <div className="text-xs text-gray-500 text-center">
-                        <p>UPI ID: company@upi</p>
-                        <p className="mt-1">Scan with any UPI app: Google Pay, PhonePe, Paytm, etc.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {paymentMethod === "card" && (
-                    <div className="space-y-3">
-                      <div>
-                        <Label htmlFor="card-number">Card Number</Label>
-                        <input
-                          id="card-number"
-                          type="text"
-                          placeholder="1234 5678 9012 3456"
-                          className="w-full p-2 border rounded-md"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label htmlFor="expiry">Expiry Date</Label>
-                          <input id="expiry" type="text" placeholder="MM/YY" className="w-full p-2 border rounded-md" />
-                        </div>
-                        <div>
-                          <Label htmlFor="cvv">CVV</Label>
-                          <input id="cvv" type="text" placeholder="123" className="w-full p-2 border rounded-md" />
-                        </div>
-                      </div>
-                      <div>
-                        <Label htmlFor="name">Name on Card</Label>
-                        <input
-                          id="name"
-                          type="text"
-                          placeholder="John Smith"
-                          className="w-full p-2 border rounded-md"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    type="submit"
-                    onClick={handlePaymentSubmit}
-                    disabled={processingPayment}
-                    className="w-full bg-[#003087] hover:bg-[#002060]"
-                  >
-                    {processingPayment ? (
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full"></div>
-                        Processing...
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        Pay $1,350.00 <ArrowRight className="h-4 w-4" />
-                      </div>
-                    )}
-                  </Button>
-                </DialogFooter>
-              </>
-            ) : (
-              <div className="py-6 flex flex-col items-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                  <Check className="h-8 w-8 text-green-600" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Payment Successful!</h3>
-                <p className="text-gray-600 text-center mb-4">
-                  Your project is now secured. We'll be in touch shortly to get started.
-                </p>
-                <p className="text-sm text-gray-500">
-                  Receipt sent to: {projectData?.registerYourself?.businessEmail || "your email"}
-                </p>
+        {selectedOption === "secure" && (
+          <div className="mt-8 max-w-md mx-auto p-6 bg-gray-50 rounded-lg border">
+            <h3 className="font-semibold mb-4 text-center">Payment Summary</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Project Estimate:</span>
+                <span>${baseAmount.toLocaleString()}</span>
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
+              <div className="flex justify-between">
+                <span>Deposit (25%):</span>
+                <span>${depositAmount.toLocaleString()}</span>
+              </div>
+              <div className="border-t pt-2 flex justify-between font-semibold">
+                <span>Due Today:</span>
+                <span>${depositAmount.toLocaleString()}</span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-4 text-center">Remaining balance due upon project completion</p>
+          </div>
+        )}
       </div>
     </div>
   )

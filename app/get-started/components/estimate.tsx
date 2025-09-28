@@ -40,16 +40,16 @@ export default function Estimate({
   // Calculate costs based on selections
   const calculateCosts = () => {
     // Base costs
-    const baseServiceCost = 2000
-    const baseIndustryCost = 1000
-    const baseTechnologyCost = 1500
-    const baseFeatureCost = 900
+    const baseServiceCost = 200
+    const baseIndustryCost = 200
+    const baseTechnologyCost = 200
+    const baseFeatureCost = 150
 
     // Calculate service costs with individual items
     const serviceItems = selectedServices.map((service, index) => {
       const cost = {
-        min: 300 + (index % 3) * 50, // Vary costs slightly for different services
-        max: 600 + (index % 3) * 100,
+        min: 50 + (index % 2) * 10, // Vary costs slightly for different services
+        max: 100 + (index % 2) * 20,
       }
       return {
         name: service.name || `Service ${index + 1}`,
@@ -66,8 +66,8 @@ export default function Estimate({
     // Calculate industry costs with individual items
     const industryItems = selectedIndustries.map((industry, index) => {
       const cost = {
-        min: 200 + (index % 4) * 40, // Vary costs slightly for different industries
-        max: 400 + (index % 4) * 80,
+        min: 50 + (index % 3) * 20, // Vary costs slightly for different industries
+        max: 100 + (index % 3) * 40,
       }
       return {
         name: industry.name || `Industry ${index + 1}`,
@@ -84,8 +84,8 @@ export default function Estimate({
     // Calculate technology costs with individual items
     const technologyItems = selectedTechnologies.map((tech, index) => {
       const cost = {
-        min: 150 + (index % 5) * 30, // Vary costs slightly for different technologies
-        max: 300 + (index % 5) * 60,
+        min: 50 + (index % 2) * 30, // Vary costs slightly for different technologies
+        max: 100 + (index % 2) * 60,
       }
       return {
         name: tech.name || `Technology ${index + 1}`,

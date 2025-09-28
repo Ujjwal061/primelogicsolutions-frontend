@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { ChevronDown, AlertCircle } from "lucide-react"
+import toast from "react-hot-toast"
 
 interface RegisterYourselfProps {
   formData?: any
@@ -22,6 +23,35 @@ export default function RegisterYourself({ formData = {}, onUpdate }: RegisterYo
     referralSource: "false",
     ...formData,
   })
+
+  const [registerClicked, setRegisterClicked] = useState(false)
+const [isRegistering, setIsRegistering] = useState(false)
+
+  // Visitor API endpoint
+  const VISITOR_API_URL = process.env.NEXT_PUBLIC_API_URL + "/visitor/register"
+
+  const handleRegisterClick = async () => {
+    setIsRegistering(true)
+    try {
+      // Send registration data to visitor API
+      const response = await fetch(VISITOR_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(onformdata),
+      })
+      const result = await response.json()
+      if (response.ok && result.success) {
+        toast.success("Registration successful!")
+        setRegisterClicked(true)
+      } else {
+        toast.error(result.message || "Registration failed. Please try again.")
+      }
+    } catch (error) {
+      toast.error("Registration failed. Please try again.")
+    } finally {
+      setIsRegistering(false)
+    }
+  }
 
   // Add useEffect to ensure parent component gets updated
   useEffect(() => {
@@ -230,6 +260,22 @@ export default function RegisterYourself({ formData = {}, onUpdate }: RegisterYo
         <a href="#" className="text-[#003087] text-sm font-medium hover:underline">
           Book a free discovery call instead →
         </a>
+      </div>
+
+      <div className="mt-8 flex flex-col items-center">
+        <button
+          type="button"
+          className={`px-6 py-3 rounded-lg font-bold bg-[#003087] text-white transition ${
+            isRegistering ? "opacity-50 cursor-not-allowed" : "hover:bg-[#002670]"
+          }`}
+          onClick={handleRegisterClick}
+          disabled={isRegistering || registerClicked}
+        >
+          {isRegistering ? "Registering..." : registerClicked ? "Registered" : "Register"}
+        </button>
+        {!registerClicked && (
+          <p className="text-xs text-red-500 mt-2">You must click "Register" to proceed.</p>
+        )}
       </div>
     </div>
   )
